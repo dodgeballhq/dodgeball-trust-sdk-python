@@ -1,8 +1,8 @@
 import asyncio
 import json
+import httpx
 
-import aiohttp
-from typing import Any, Awaitable, Callable, Mapping, Optional
+from typing import Any, Awaitable, Callable, Generic, Mapping, Optional, TypeVar
 from urllib.parse import urljoin
 from pydantic import BaseModel
 
@@ -33,11 +33,12 @@ def not_null_or_value(val: Any, default: Any):
 
 class HttpQuery:
 
-    def __init__(self, base_url: str, call_path: str):
+    def __init__(self, base_url: str, call_path: str, method: str = "POST"):
         self.headers = {}
         self.base_url = base_url
         self.call_path = call_path
         self.body: BaseModel = None
+        self.method = method
 
     def set_dodgeball_headers(
             self,
@@ -78,20 +79,43 @@ class HttpQuery:
         self.body = body
         return self
 
-    async def try_post_dodgeball(self, url):
+    async def try_query_dodgeball(
+            self,
+            url,
+            parser:Callable[[Any], BaseModel])->asyncio.Future[BaseModel]:
         try:
             DodgeballLogger.info("About to invoke logger")
+            headers = {}
+            if self.headers is not None:
+                for key in self.headers:
+                    headers[key] = self.headers[key]
 
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.post(url, json=self.transform_event_body(self.body)) as response:
-                    response_dict = await response.json()
-                    to_return = DodgeballResponse.parse_obj(response_dict)
-                    success = True
+            async with httpx.AsyncClient() as client:
+                if(self.method == "POST"):
+                    headers["Content-Type"] = "application/json"
+                    response = await client.post(
+                        url,
+                        headers=headers,
+                        content=self.body.json(exclude_none=True, exclude_unset=True)
+                    )
+                else:
+                    # For now we only need POST and GET
+                    response = await client.get(
+                        url,
+                        headers=headers
+                    )
 
-                    return {
-                        "success": True,
-                        "response": to_return
-                    }
+                if not response.is_success:
+                    raise Exception("Error posting Dodgeball request")
+
+                response_dict = response.json()
+                to_return = parser(response_dict)
+                success = True
+
+                return {
+                    "success": True,
+                    "response": to_return
+                }
 
         except Exception as exc:
             DodgeballLogger.error("Possibly empty error", exc_info=exc)
@@ -109,7 +133,9 @@ class HttpQuery:
         try_num = 0
         error_message = "Unknown Error"
         while try_num < 3 and not success:
-            response_block = await self.try_post_dodgeball(urlToCall)
+            response_block = await self.try_query_dodgeball(
+                urlToCall,
+                lambda parsed_dict: DodgeballResponse.parse_obj(parsed_dict))
             if response_block["success"]:
                 return response_block["response"]
             else:
@@ -124,32 +150,6 @@ class HttpQuery:
             errors = [DodgeballError(message = error_message)]
         )
 
-    def transform_event_body(self, body: BaseModel):
-        if body is None:
-            return None
-
-        body_json = body.json(exclude_none=True, exclude_unset=True)
-        return json.loads(body_json)
-
-
-    async def try_post_dodgeball_checkpoint(self, url):
-        try:
-            DodgeballLogger.info("About to try posting a checkpoint")
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.post(url, json=self.transform_event_body(self.body)) as response:
-                    response_dict = await response.json()
-                    to_return = DodgeballCheckpointResponse.parse_obj(response_dict)
-
-                    return {
-                        "success": True,
-                        "response": to_return
-                    }
-
-        except Exception as exc:
-            DodgeballLogger.error("Possibly empty error", exc_info=exc)
-            return {"success": False, "response": None, "error": exc}
-
-
     async def post_dodgeball_checkpoint(self) -> asyncio.Future[DodgeballCheckpointResponse]:
         if self.body is None:
             raise Exception("Must provide non-null base url")
@@ -161,8 +161,10 @@ class HttpQuery:
         error_message = "Uknown Error"
         try_num = 0
         while try_num < 3:
-            response_body = await self.try_post_dodgeball_checkpoint(
-                urlToCall)
+            response_body = await self.try_query_dodgeball(
+                urlToCall,
+                lambda json_body: DodgeballCheckpointResponse.parse_obj(json_body)
+            )
 
             if response_body["success"]:
                 return response_body["response"]
@@ -183,22 +185,17 @@ class HttpQuery:
         success: bool = False
         try_num = 0
         while try_num < 3 and not success:
-            try:
-                DodgeballLogger.info("About to invoke logger")
+            response_block = await self.try_query_dodgeball(
+                urlToCall,
+                lambda json_body: DodgeballCheckpointResponse.parse_obj(json_body)
+            )
 
-                async with aiohttp.ClientSession(headers = self.headers) as session:
-                    async with session.get(urlToCall) as response:
-                        response_dict = await response.json()
-                        to_return = DodgeballCheckpointResponse.parse_obj(
-                            response_dict
-                        )
-
-                        success = True
-                        return to_return
-
-            except Exception:
-                DodgeballLogger.error("Possibly empty error", exc_info = True)
+            if response_block["success"]:
+                success = True
+                return response_block["response"]
+            else:
                 try_num += 1
+                DodgeballLogger.error("Possibly temporary error", response_block["error"])
 
         raise Exception("Could not evaluate")
 
