@@ -49,8 +49,8 @@ class VerificationStepData(BaseModel):
 
 
 class LibContent(BaseModel):
-    url: str
-    text: str
+    url: Optional[str]
+    text: Optional[str]
 
 
 class LibConfig(BaseModel):
@@ -72,7 +72,7 @@ class DodgeballVerification(BaseModel):
     status: str
     outcome: str
     stepData: Optional[VerificationStepData]
-    nextSteps: List[VerificationStep]
+    nextSteps: Optional[List[VerificationStep]]
     error: Optional[DodgeballError]
 
 

@@ -70,7 +70,6 @@ class Dodgeball:
             if self.config and not string_null_or_empty(self.config.apiUrl):
                 base_url = self.config.apiUrl
 
-
             http_query = HttpQuery(
                 base_url,
                 "/v1/track/").set_dodgeball_headers(
@@ -108,10 +107,10 @@ class Dodgeball:
                 verification_id = use_verification_id
             )
 
-
             http_query = HttpQuery(
                 base_url,
                 method_url,
+                "GET"
             ).set_dodgeball_headers(
                 self.secretKey,
                 session_id,
@@ -193,6 +192,9 @@ class Dodgeball:
             if sync_response is None:
                 sync_response = True
 
+            if active_timeout and active_timeout > 0:
+                sync_response = False
+
             internal_options = CheckpointResponseOptions(
                 sync = sync_response,
                 timeout = active_timeout,
@@ -247,9 +249,9 @@ class Dodgeball:
             while not is_resolved and num_failures < self.MAX_RETRY_COUNT and \
                 not is_timeout:
 
-                sleep(activeTimeout/1000)
-                if activeTimeout < maximal_timeout:
-                    activeTimeout = 2*active_timeout
+                sleep(active_timeout/1000)
+                if active_timeout < maximal_timeout:
+                    active_timeout = 2*active_timeout
 
                 response = await self.get_checkpoint(
                     source_token,
