@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "dodgeball-server-sdk"
-version = "0.1.0"
-description = ""
-authors = ["Andrew Schwartz sdk@dodgeballhq.com"]
+version = "1.0.0"
+description = "The Dodgeball Trust Server SDK for Python"
+authors = ["Andrew Schwartz <tools@dodgeballhq.com>",
+"Patrick Teague <sdk@dodgeballhq.com>"]
 readme = "README.md"
 packages = [{include = "dodgeball"}]
 

@@ -78,7 +78,7 @@ class DodgeballVerification(BaseModel):
 
 class DodgeballCheckpointResponse(DodgeballResponse):
     success: bool
-    errors: List[DodgeballError]
-    version: str
+    errors: Optional[List[DodgeballError]]
+    version: Optional[str]
     verification: Optional[DodgeballVerification]
     isTimeout: Optional[bool]
