@@ -34,6 +34,8 @@ class TestDodgeball:
                     "primaryPhone": "17609003548",
                     "firstName": "CannedFirst"
                 },
+                # Phone numbers are not authenticated on the first pass
+                "mfa": {"phoneNumbers": "+16175551212"},
                 "session": {
                     "userAgent": "unknown user header",
                     "externalId":"UNK  RAW Session"
@@ -71,7 +73,7 @@ class TestDodgeball:
             },
             # For now we set a hard-coded list of phone numbers, this can
             # be filled in from the client in order to dynamically set
-            "mfaPhoneNumbers": SimpleEnv.get_value("MFA_PHONE_NUMBERS"),
+            "mfa": {"phoneNumbers": SimpleEnv.get_value("MFA_PHONE_NUMBERS")},
             "email": "test@dodgeballhq.com",
             # Gr4vy Testing
             "gr4vy": {
